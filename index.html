@@ -681,14 +681,19 @@ print("="*40)`
                 
                 console.log('Loading Pyodide...');
                 
-                // Load Pyodide with minimal options first
-                state.pyodide = await loadPyodide();
+                // Create input handler that prompts the user
+                const inputHandler = () => {
+                    return prompt('Input requested by Python program:');
+                };
+                
+                // Load Pyodide with custom stdio handlers
+                state.pyodide = await loadPyodide({
+                    stdin: inputHandler,
+                    stdout: (text) => addToConsole(text, 'normal'),
+                    stderr: (text) => addToConsole(text, 'error')
+                });
                 
                 console.log('Pyodide loaded, setting up stdout/stderr...');
-                
-                // Set up stdout/stderr after loading
-                state.pyodide.setStdout({ batched: (text) => addToConsole(text, 'normal') });
-                state.pyodide.setStderr({ batched: (text) => addToConsole(text, 'error') });
                 
                 // Try to load micropip, but don't fail if it doesn't work
                 try {
@@ -704,6 +709,7 @@ print("="*40)`
                 console.log('Pyodide ready!');
                 addToConsole('Python environment loaded successfully! 🐍', 'success');
                 addToConsole('Ready to run code. Try: print("Hello, World!")', 'normal');
+                addToConsole('Note: input() will show a popup dialog', 'normal');
             } catch (error) {
                 console.error('Failed to load Pyodide:', error);
                 console.error('Error stack:', error.stack);
