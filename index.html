@@ -6,7 +6,7 @@
     <title>Python Learning IDE</title>
     
     <!-- Monaco Editor -->
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
     
     <!-- Pyodide -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
@@ -592,8 +592,76 @@ print("="*40)`
             // Load theme
             document.body.setAttribute('data-theme', state.theme);
             
-            // Initialize Pyodide
             try {
+                // Initialize Monaco Editor first
+                await initMonaco();
+                
+                // Then initialize Pyodide
+                await initPyodide();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.querySelector('.loading-text').textContent = 'Error loading. Please refresh.';
+            }
+            
+            // Set up resize handler
+            setupResize();
+        }
+        
+        function initMonaco() {
+            return new Promise((resolve, reject) => {
+                // Configure Monaco paths
+                require.config({ 
+                    paths: { 
+                        'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' 
+                    }
+                });
+                
+                require(['vs/editor/editor.main'], function() {
+                    try {
+                        state.editor = monaco.editor.create(document.getElementById('editor-container'), {
+                            value: '',
+                            language: 'python',
+                            theme: state.theme === 'dark' ? 'vs-dark' : 'vs',
+                            automaticLayout: true,
+                            minimap: { enabled: false },
+                            fontSize: 14,
+                            lineNumbers: 'on',
+                            roundedSelection: false,
+                            scrollBeyondLastLine: false,
+                            readOnly: false
+                        });
+                        
+                        // Auto-save on change
+                        state.editor.onDidChangeModelContent(() => {
+                            if (state.activeFile) {
+                                state.files[state.activeFile].content = state.editor.getValue();
+                                saveFiles();
+                            }
+                        });
+                        
+                        // Load files from localStorage or create defaults
+                        loadFiles();
+                        
+                        // Check for shared code in URL
+                        loadFromUrl();
+                        
+                        resolve();
+                    } catch (error) {
+                        console.error('Monaco initialization error:', error);
+                        reject(error);
+                    }
+                }, function(error) {
+                    console.error('Monaco loading error:', error);
+                    reject(error);
+                });
+            });
+        }
+        
+        async function initPyodide() {
+            try {
+                document.querySelector('.loading-text').textContent = 'Loading Python environment...';
+                
                 state.pyodide = await loadPyodide();
                 await state.pyodide.loadPackage('micropip');
                 
@@ -603,45 +671,13 @@ print("="*40)`
                 
                 // Hide loading overlay
                 document.getElementById('loading-overlay').style.display = 'none';
+                
+                addToConsole('Python environment loaded successfully! 🐍', 'success');
             } catch (error) {
                 console.error('Failed to load Pyodide:', error);
-                addToConsole('Error loading Python environment. Please refresh the page.', 'error');
+                addToConsole('⚠️ Warning: Python execution not available. Editor works but code won\'t run.', 'error');
+                document.getElementById('loading-overlay').style.display = 'none';
             }
-            
-            // Initialize Monaco Editor
-            require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' }});
-            
-            require(['vs/editor/editor.main'], function() {
-                state.editor = monaco.editor.create(document.getElementById('editor-container'), {
-                    value: '',
-                    language: 'python',
-                    theme: state.theme === 'dark' ? 'vs-dark' : 'vs',
-                    automaticLayout: true,
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    roundedSelection: false,
-                    scrollBeyondLastLine: false,
-                    readOnly: false
-                });
-                
-                // Auto-save on change
-                state.editor.onDidChangeModelContent(() => {
-                    if (state.activeFile) {
-                        state.files[state.activeFile].content = state.editor.getValue();
-                        saveFiles();
-                    }
-                });
-                
-                // Load files from localStorage or create defaults
-                loadFiles();
-                
-                // Check for shared code in URL
-                loadFromUrl();
-            });
-            
-            // Set up resize handler
-            setupResize();
         }
 
         // File Management
