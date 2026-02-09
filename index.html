@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Learning IDE</title>
+    
+    <!-- Monaco Editor -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    
+    <!-- Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    
+    <!-- LZ-String for URL compression -->
+    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --text-primary: #d4d4d4;
+            --text-secondary: #858585;
+            --accent: #007acc;
+            --accent-hover: #005a9e;
+            --success: #4ec9b0;
+            --error: #f44747;
+            --warning: #cca700;
+            --border: #3e3e42;
+        }
+        
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f3f3;
+            --bg-tertiary: #e8e8e8;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --accent: #0078d4;
+            --accent-hover: #005a9e;
+            --border: #e0e0e0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            height: 50px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #3776ab, #ffd43b);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 50px);
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 200px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 12px 15px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            border-left: 3px solid transparent;
+        }
+        
+        .file-item:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .file-item.active {
+            background: var(--bg-tertiary);
+            border-left-color: var(--accent);
+        }
+        
+        .file-icon {
+            font-size: 14px;
+        }
+        
+        .file-name-input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: 13px;
+            flex: 1;
+            outline: none;
+            border-bottom: 1px solid var(--accent);
+        }
+        
+        /* Editor Area */
+        .editor-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .tabs-bar {
+            display: flex;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            border-right: 1px solid var(--border);
+            white-space: nowrap;
+            background: var(--bg-secondary);
+        }
+        
+        .tab:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .tab.active {
+            background: var(--bg-primary);
+            border-bottom: 2px solid var(--accent);
+        }
+        
+        .tab-close {
+            opacity: 0;
+            padding: 2px;
+            border-radius: 3px;
+        }
+        
+        .tab:hover .tab-close,
+        .tab.active .tab-close {
+            opacity: 1;
+        }
+        
+        .tab-close:hover {
+            background: var(--error);
+            color: white;
+        }
+        
+        #editor-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        /* Output Panel */
+        .output-panel {
+            height: 200px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .output-tabs {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .output-tab {
+            padding: 8px 20px;
+            cursor: pointer;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .output-tab:hover {
+            background: var(--border);
+        }
+        
+        .output-tab.active {
+            border-bottom-color: var(--accent);
+            background: var(--bg-secondary);
+        }
+        
+        .output-content {
+            flex: 1;
+            overflow: auto;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .console-line {
+            padding: 2px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .console-line.error {
+            color: var(--error);
+        }
+        
+        .console-line.success {
+            color: var(--success);
+        }
+        
+        #turtle-canvas {
+            display: none;
+            width: 100%;
+            height: 100%;
+            background: white;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 20px;
+            color: var(--text-secondary);
+        }
+        
+        /* Templates Dropdown */
+        .templates-dropdown {
+            position: relative;
+        }
+        
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            min-width: 180px;
+            display: none;
+            z-index: 100;
+        }
+        
+        .dropdown-menu.show {
+            display: block;
+        }
+        
+        .dropdown-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .dropdown-item:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: var(--success);
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        /* Resize handle */
+        .resize-handle {
+            height: 4px;
+            background: var(--border);
+            cursor: row-resize;
+            transition: background 0.2s;
+        }
+        
+        .resize-handle:hover {
+            background: var(--accent);
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Python environment...</div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">Py</div>
+            <span>Python Learning IDE</span>
+        </div>
+        <div class="header-buttons">
+            <div class="templates-dropdown">
+                <button class="btn btn-secondary" onclick="toggleTemplates()">
+                    📋 Templates
+                </button>
+                <div id="templates-menu" class="dropdown-menu">
+                    <div class="dropdown-item" onclick="loadTemplate('hello')">👋 Hello World</div>
+                    <div class="dropdown-item" onclick="loadTemplate('calculator')">🧮 Calculator</div>
+                    <div class="dropdown-item" onclick="loadTemplate('turtle')">🐢 Turtle Art</div>
+                    <div class="dropdown-item" onclick="loadTemplate('game')">🎮 Guessing Game</div>
+                    <div class="dropdown-item" onclick="loadTemplate('madlibs')">📖 Mad Libs</div>
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="shareCode()">
+                🔗 Share
+            </button>
+            <button class="btn btn-secondary" onclick="toggleTheme()">
+                🌓 Theme
+            </button>
+            <button id="run-btn" class="btn btn-primary" onclick="runCode()">
+                ▶ Run
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>Explorer</span>
+                <button class="btn btn-secondary" style="padding: 4px 8px;" onclick="newFile()">
+                    + New
+                </button>
+            </div>
+            <div id="file-list" class="file-list">
+                <!-- Files will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Editor Area -->
+        <div class="editor-area">
+            <div id="tabs-bar" class="tabs-bar">
+                <!-- Tabs will be rendered here -->
+            </div>
+            <div id="editor-container"></div>
+            <div class="resize-handle" id="resize-handle"></div>
+            
+            <!-- Output Panel -->
+            <div id="output-panel" class="output-panel" style="height: 200px;">
+                <div class="output-tabs">
+                    <div class="output-tab active" onclick="switchOutputTab('console')">Console</div>
+                    <div class="output-tab" onclick="switchOutputTab('turtle')">Turtle</div>
+                </div>
+                <div id="console-output" class="output-content"></div>
+                <canvas id="turtle-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // State management
+        let state = {
+            files: {},
+            activeFile: null,
+            theme: localStorage.getItem('pyide_theme') || 'dark',
+            pyodide: null,
+            editor: null,
+            turtleCommands: [],
+            isRunning: false
+        };
+
+        // Templates
+        const templates = {
+            hello: `print("Hello, World!")
+name = input("What's your name? ")
+print(f"Nice to meet you, {name}!")`,
+            
+            calculator: `# Simple Calculator
+print("=== Simple Calculator ===")
+
+num1 = float(input("Enter first number: "))
+num2 = float(input("Enter second number: "))
+operation = input("Choose operation (+, -, *, /): ")
+
+if operation == "+":
+    result = num1 + num2
+elif operation == "-":
+    result = num1 - num2
+elif operation == "*":
+    result = num1 * num2
+elif operation == "/":
+    if num2 != 0:
+        result = num1 / num2
+    else:
+        result = "Error: Cannot divide by zero"
+else:
+    result = "Invalid operation"
+
+print(f"Result: {result}")`,
+            
+            turtle: `import turtle
+
+# Create turtle
+t = turtle.Turtle()
+t.speed(5)
+
+# Draw a colorful spiral
+colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple']
+
+for i in range(36):
+    t.color(colors[i % 6])
+    t.forward(i * 5)
+    t.right(60)
+
+print("Spiral complete!")`,
+            
+            game: `import random
+
+print("=== Guess the Number Game ===")
+print("I'm thinking of a number between 1 and 100")
+
+secret_number = random.randint(1, 100)
+attempts = 0
+max_attempts = 7
+
+while attempts < max_attempts:
+    guess = int(input(f"Attempt {attempts + 1}/{max_attempts}: "))
+    attempts += 1
+    
+    if guess < secret_number:
+        print("Too low!")
+    elif guess > secret_number:
+        print("Too high!")
+    else:
+        print(f"Congratulations! You got it in {attempts} attempts!")
+        break
+else:
+    print(f"Game over! The number was {secret_number}")`,
+            
+            madlibs: `print("=== Mad Libs Story ===")
+print("Answer the questions to create a funny story!\n")
+
+noun1 = input("Enter a noun (person, place, or thing): ")
+adjective1 = input("Enter an adjective: ")
+verb1 = input("Enter a verb: ")
+place = input("Enter a place: ")
+adjective2 = input("Enter another adjective: ")
+
+story = f"""
+Once upon a time, there was a {adjective1} {noun1} who loved to {verb1}.
+One day, they went to {place} and met a {adjective2} dragon!
+The dragon said, "Hello, little {noun1}! Let's {verb1} together!"
+And they all lived happily ever after.
+"""
+
+print("\n" + "="*40)
+print(story)
+print("="*40)`
+        };
+
+        // Initialize
+        async function init() {
+            // Load theme
+            document.body.setAttribute('data-theme', state.theme);
+            
+            // Initialize Pyodide
+            try {
+                state.pyodide = await loadPyodide();
+                await state.pyodide.loadPackage('micropip');
+                
+                // Set up stdout/stderr redirection
+                state.pyodide.setStdout({ batched: (text) => addToConsole(text, 'normal') });
+                state.pyodide.setStderr({ batched: (text) => addToConsole(text, 'error') });
+                
+                // Hide loading overlay
+                document.getElementById('loading-overlay').style.display = 'none';
+            } catch (error) {
+                console.error('Failed to load Pyodide:', error);
+                addToConsole('Error loading Python environment. Please refresh the page.', 'error');
+            }
+            
+            // Initialize Monaco Editor
+            require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' }});
+            
+            require(['vs/editor/editor.main'], function() {
+                state.editor = monaco.editor.create(document.getElementById('editor-container'), {
+                    value: '',
+                    language: 'python',
+                    theme: state.theme === 'dark' ? 'vs-dark' : 'vs',
+                    automaticLayout: true,
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    lineNumbers: 'on',
+                    roundedSelection: false,
+                    scrollBeyondLastLine: false,
+                    readOnly: false
+                });
+                
+                // Auto-save on change
+                state.editor.onDidChangeModelContent(() => {
+                    if (state.activeFile) {
+                        state.files[state.activeFile].content = state.editor.getValue();
+                        saveFiles();
+                    }
+                });
+                
+                // Load files from localStorage or create defaults
+                loadFiles();
+                
+                // Check for shared code in URL
+                loadFromUrl();
+            });
+            
+            // Set up resize handler
+            setupResize();
+        }
+
+        // File Management
+        function loadFiles() {
+            const saved = localStorage.getItem('pyide_files');
+            if (saved) {
+                state.files = JSON.parse(saved);
+            } else {
+                // Create default files
+                state.files = {
+                    'main.py': { content: templates.hello },
+                    'helpers.py': { content: '# Helper functions go here\n\ndef greet(name):\n    return f"Hello, {name}!"' },
+                    'turtle_example.py': { content: templates.turtle }
+                };
+                saveFiles();
+            }
+            state.activeFile = Object.keys(state.files)[0];
+            renderFiles();
+            renderTabs();
+            loadFileContent(state.activeFile);
+        }
+
+        function saveFiles() {
+            localStorage.setItem('pyide_files', JSON.stringify(state.files));
+        }
+
+        function newFile() {
+            let filename = 'new_file.py';
+            let counter = 1;
+            while (state.files[filename]) {
+                filename = `new_file_${counter}.py`;
+                counter++;
+            }
+            
+            state.files[filename] = { content: '# New file\n' };
+            state.activeFile = filename;
+            saveFiles();
+            renderFiles();
+            renderTabs();
+            loadFileContent(filename);
+        }
+
+        function deleteFile(filename) {
+            if (Object.keys(state.files).length <= 1) {
+                showToast('Cannot delete the last file', 'error');
+                return;
+            }
+            
+            delete state.files[filename];
+            if (state.activeFile === filename) {
+                state.activeFile = Object.keys(state.files)[0];
+            }
+            saveFiles();
+            renderFiles();
+            renderTabs();
+            if (state.activeFile) {
+                loadFileContent(state.activeFile);
+            }
+        }
+
+        function renameFile(oldName, newName) {
+            if (!newName || newName === oldName) return;
+            if (state.files[newName]) {
+                showToast('File already exists', 'error');
+                return;
+            }
+            
+            state.files[newName] = state.files[oldName];
+            delete state.files[oldName];
+            if (state.activeFile === oldName) {
+                state.activeFile = newName;
+            }
+            saveFiles();
+            renderFiles();
+            renderTabs();
+        }
+
+        function switchFile(filename) {
+            if (state.activeFile) {
+                state.files[state.activeFile].content = state.editor.getValue();
+            }
+            state.activeFile = filename;
+            renderFiles();
+            renderTabs();
+            loadFileContent(filename);
+        }
+
+        function loadFileContent(filename) {
+            if (state.editor) {
+                state.editor.setValue(state.files[filename].content);
+            }
+        }
+
+        function renderFiles() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = '';
+            
+            Object.keys(state.files).forEach(filename => {
+                const item = document.createElement('div');
+                item.className = `file-item ${filename === state.activeFile ? 'active' : ''}`;
+                item.innerHTML = `
+                    <span class="file-icon">🐍</span>
+                    <span class="file-name">${filename}</span>
+                `;
+                item.onclick = (e) => {
+                    if (!e.target.closest('.file-name-input')) {
+                        switchFile(filename);
+                    }
+                };
+                item.ondblclick = () => {
+                    const nameSpan = item.querySelector('.file-name');
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'file-name-input';
+                    input.value = filename;
+                    input.onblur = () => {
+                        renameFile(filename, input.value);
+                    };
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') {
+                            input.blur();
+                        }
+                    };
+                    nameSpan.replaceWith(input);
+                    input.focus();
+                    input.select();
+                };
+                list.appendChild(item);
+            });
+        }
+
+        function renderTabs() {
+            const tabsBar = document.getElementById('tabs-bar');
+            tabsBar.innerHTML = '';
+            
+            Object.keys(state.files).forEach(filename => {
+                const tab = document.createElement('div');
+                tab.className = `tab ${filename === state.activeFile ? 'active' : ''}`;
+                tab.innerHTML = `
+                    <span>🐍</span>
+                    <span>${filename}</span>
+                    <span class="tab-close" onclick="event.stopPropagation(); deleteFile('${filename}')">×</span>
+                `;
+                tab.onclick = () => switchFile(filename);
+                tabsBar.appendChild(tab);
+            });
+        }
+
+        // Code Execution
+        async function runCode() {
+            if (!state.pyodide || state.isRunning) return;
+            
+            const code = state.editor.getValue();
+            const consoleOutput = document.getElementById('console-output');
+            consoleOutput.innerHTML = '';
+            
+            // Switch to console tab
+            switchOutputTab('console');
+            
+            state.isRunning = true;
+            document.getElementById('run-btn').disabled = true;
+            document.getElementById('run-btn').textContent = '⏳ Running...';
+            
+            try {
+                // Set up turtle interception
+                setupTurtle();
+                
+                // Run the code
+                await state.pyodide.runPythonAsync(code);
+                
+                // Show success
+                if (!consoleOutput.innerHTML.includes('class="console-line error"')) {
+                    addToConsole('\n✓ Code executed successfully!', 'success');
+                }
+                
+                // Render turtle if there were commands
+                if (state.turtleCommands.length > 0) {
+                    renderTurtle();
+                }
+            } catch (error) {
+                addToConsole(`\nError: ${error.message}`, 'error');
+            } finally {
+                state.isRunning = false;
+                document.getElementById('run-btn').disabled = false;
+                document.getElementById('run-btn').textContent = '▶ Run';
+            }
+        }
+
+        // Turtle Graphics
+        function setupTurtle() {
+            state.turtleCommands = [];
+            
+            const turtleCode = `
+import js
+from pyodide.ffi import create_proxy
+
+class MockTurtle:
+    def __init__(self):
+        self._x = 200
+        self._y = 200
+        self._heading = 0
+        self._pen_down = True
+        self._color = 'black'
+        self._width = 2
+        self._speed = 5
+        
+    def forward(self, distance):
+        js.sendTurtleCommand('forward', distance)
+        
+    def backward(self, distance):
+        js.sendTurtleCommand('backward', distance)
+        
+    def left(self, angle):
+        js.sendTurtleCommand('left', angle)
+        
+    def right(self, angle):
+        js.sendTurtleCommand('right', angle)
+        
+    def penup(self):
+        js.sendTurtleCommand('penup')
+        
+    def pendown(self):
+        js.sendTurtleCommand('pendown')
+        
+    def color(self, color):
+        js.sendTurtleCommand('color', color)
+        
+    def width(self, width):
+        js.sendTurtleCommand('width', width)
+        
+    def speed(self, speed):
+        js.sendTurtleCommand('speed', speed)
+        
+    def circle(self, radius):
+        js.sendTurtleCommand('circle', radius)
+        
+    def goto(self, x, y):
+        js.sendTurtleCommand('goto', [x, y])
+        
+    def setx(self, x):
+        js.sendTurtleCommand('setx', x)
+        
+    def sety(self, y):
+        js.sendTurtleCommand('sety', y)
+        
+    def setheading(self, angle):
+        js.sendTurtleCommand('setheading', angle)
+        
+    def home(self):
+        js.sendTurtleCommand('home')
+        
+    def dot(self, size=None, color=None):
+        js.sendTurtleCommand('dot', {'size': size, 'color': color})
+
+# Create turtle instance
+turtle = MockTurtle()
+
+# Make available for import
+import sys
+sys.modules['turtle'] = type(sys)('turtle')
+sys.modules['turtle'].Turtle = MockTurtle
+sys.modules['turtle'].turtle = MockTurtle()
+            `;
+            
+            state.pyodide.runPython(turtleCode);
+        }
+
+        function sendTurtleCommand(command, value) {
+            state.turtleCommands.push({ command, value });
+        }
+        
+        // Make available to Python
+        window.sendTurtleCommand = sendTurtleCommand;
+
+        function renderTurtle() {
+            const canvas = document.getElementById('turtle-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Initialize turtle state
+            let x = canvas.width / 2;
+            let y = canvas.height / 2;
+            let heading = 0; // 0 degrees is right
+            let penDown = true;
+            let penColor = 'black';
+            let penWidth = 2;
+            
+            // Execute commands
+            ctx.strokeStyle = penColor;
+            ctx.lineWidth = penWidth;
+            ctx.lineCap = 'round';
+            
+            state.turtleCommands.forEach(cmd => {
+                switch(cmd.command) {
+                    case 'forward':
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        const rad = heading * Math.PI / 180;
+                        x += cmd.value * Math.cos(rad);
+                        y += cmd.value * Math.sin(rad);
+                        if (penDown) {
+                            ctx.lineTo(x, y);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'backward':
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        const rad2 = heading * Math.PI / 180;
+                        x -= cmd.value * Math.cos(rad2);
+                        y -= cmd.value * Math.sin(rad2);
+                        if (penDown) {
+                            ctx.lineTo(x, y);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'left':
+                        heading -= cmd.value;
+                        break;
+                        
+                    case 'right':
+                        heading += cmd.value;
+                        break;
+                        
+                    case 'penup':
+                        penDown = false;
+                        break;
+                        
+                    case 'pendown':
+                        penDown = true;
+                        break;
+                        
+                    case 'color':
+                        penColor = cmd.value;
+                        ctx.strokeStyle = penColor;
+                        break;
+                        
+                    case 'width':
+                        penWidth = cmd.value;
+                        ctx.lineWidth = penWidth;
+                        break;
+                        
+                    case 'setheading':
+                        heading = cmd.value;
+                        break;
+                        
+                    case 'goto':
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        x = canvas.width / 2 + cmd.value[0];
+                        y = canvas.height / 2 - cmd.value[1];
+                        if (penDown) {
+                            ctx.lineTo(x, y);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'home':
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        x = canvas.width / 2;
+                        y = canvas.height / 2;
+                        heading = 0;
+                        if (penDown) {
+                            ctx.lineTo(x, y);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'circle':
+                        ctx.beginPath();
+                        const radius = cmd.value;
+                        const startX = x + radius * Math.cos((heading + 90) * Math.PI / 180);
+                        const startY = y + radius * Math.sin((heading + 90) * Math.PI / 180);
+                        ctx.arc(startX, startY - radius, Math.abs(radius), 0, 2 * Math.PI);
+                        ctx.stroke();
+                        break;
+                        
+                    case 'dot':
+                        ctx.beginPath();
+                        const dotSize = cmd.value.size || 5;
+                        ctx.fillStyle = cmd.value.color || penColor;
+                        ctx.arc(x, y, dotSize, 0, 2 * Math.PI);
+                        ctx.fill();
+                        break;
+                }
+            });
+            
+            // Show turtle tab if there were commands
+            if (state.turtleCommands.length > 0) {
+                switchOutputTab('turtle');
+            }
+        }
+
+        // Output Management
+        function addToConsole(text, type = 'normal') {
+            const consoleOutput = document.getElementById('console-output');
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = text;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function switchOutputTab(tab) {
+            const tabs = document.querySelectorAll('.output-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event?.target?.classList.add('active');
+            
+            const consoleOutput = document.getElementById('console-output');
+            const turtleCanvas = document.getElementById('turtle-canvas');
+            
+            if (tab === 'console') {
+                consoleOutput.style.display = 'block';
+                turtleCanvas.style.display = 'none';
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                consoleOutput.style.display = 'none';
+                turtleCanvas.style.display = 'block';
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+
+        // Templates
+        function toggleTemplates() {
+            const menu = document.getElementById('templates-menu');
+            menu.classList.toggle('show');
+        }
+
+        function loadTemplate(templateName) {
+            document.getElementById('templates-menu').classList.remove('show');
+            
+            if (templates[templateName]) {
+                state.files[state.activeFile].content = templates[templateName];
+                saveFiles();
+                state.editor.setValue(templates[templateName]);
+                showToast(`Loaded ${templateName.replace('_', ' ')} template`);
+            }
+        }
+
+        // URL Sharing
+        function shareCode() {
+            const code = state.editor.getValue();
+            const compressed = LZString.compressToEncodedURIComponent(code);
+            const url = `${window.location.origin}${window.location.pathname}#${compressed}`;
+            
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('Link copied to clipboard!');
+            }).catch(() => {
+                showToast('Failed to copy link', 'error');
+            });
+        }
+
+        function loadFromUrl() {
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                try {
+                    const code = LZString.decompressFromEncodedURIComponent(hash);
+                    if (code) {
+                        state.files[state.activeFile].content = code;
+                        saveFiles();
+                        state.editor.setValue(code);
+                        showToast('Loaded code from shared link');
+                    }
+                } catch (e) {
+                    console.error('Failed to load from URL:', e);
+                }
+            }
+        }
+
+        // Theme Toggle
+        function toggleTheme() {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', state.theme);
+            localStorage.setItem('pyide_theme', state.theme);
+            
+            if (state.editor) {
+                monaco.editor.setTheme(state.theme === 'dark' ? 'vs-dark' : 'vs');
+            }
+        }
+
+        // Toast Notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'error' ? 'var(--error)' : 'var(--success)';
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Resize Panel
+        function setupResize() {
+            const handle = document.getElementById('resize-handle');
+            const panel = document.getElementById('output-panel');
+            let isResizing = false;
+            let startY, startHeight;
+            
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startY = e.clientY;
+                startHeight = parseInt(document.defaultView.getComputedStyle(panel).height, 10);
+                document.body.style.cursor = 'row-resize';
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const height = startHeight - (e.clientY - startY);
+                panel.style.height = `${height}px`;
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+            });
+        }
+
+        // Close templates dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.templates-dropdown')) {
+                document.getElementById('templates-menu').classList.remove('show');
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    runCode();
+                }
+            }
+        });
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
