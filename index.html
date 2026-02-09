@@ -595,29 +595,61 @@ print("="*40)`
             try {
                 // Initialize Monaco Editor first
                 await initMonaco();
-                
-                // Then initialize Pyodide
-                await initPyodide();
-                
             } catch (error) {
-                console.error('Initialization error:', error);
-                document.querySelector('.loading-text').textContent = 'Error loading. Please refresh.';
+                console.error('Monaco initialization error:', error);
+                showToast('Editor failed to load. Using fallback.', 'error');
+                createFallbackEditor();
             }
+            
+            // Then initialize Pyodide (don't await, let it load in background)
+            initPyodide();
             
             // Set up resize handler
             setupResize();
         }
         
+        function createFallbackEditor() {
+            // Create a simple textarea as fallback
+            const container = document.getElementById('editor-container');
+            container.innerHTML = '<textarea id="fallback-editor" style="width:100%;height:100%;padding:10px;font-family:monospace;font-size:14px;background:var(--bg-primary);color:var(--text-primary);border:none;resize:none;"></textarea>';
+            
+            const textarea = document.getElementById('fallback-editor');
+            state.editor = {
+                getValue: () => textarea.value,
+                setValue: (val) => { textarea.value = val; },
+                onDidChangeModelContent: (callback) => {
+                    textarea.addEventListener('input', callback);
+                }
+            };
+            
+            // Load files
+            loadFiles();
+            loadFromUrl();
+        }
+        
         function initMonaco() {
             return new Promise((resolve, reject) => {
+                // Wait for require to be available
+                if (typeof require === 'undefined') {
+                    reject(new Error('Monaco loader not available'));
+                    return;
+                }
+                
                 // Configure Monaco paths
                 require.config({ 
                     paths: { 
                         'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' 
-                    }
+                    },
+                    waitSeconds: 30
                 });
                 
+                // Set timeout for Monaco loading
+                const timeout = setTimeout(() => {
+                    reject(new Error('Monaco loading timeout'));
+                }, 10000);
+                
                 require(['vs/editor/editor.main'], function() {
+                    clearTimeout(timeout);
                     try {
                         state.editor = monaco.editor.create(document.getElementById('editor-container'), {
                             value: '',
@@ -652,6 +684,7 @@ print("="*40)`
                         reject(error);
                     }
                 }, function(error) {
+                    clearTimeout(timeout);
                     console.error('Monaco loading error:', error);
                     reject(error);
                 });
@@ -662,21 +695,38 @@ print("="*40)`
             try {
                 document.querySelector('.loading-text').textContent = 'Loading Python environment...';
                 
-                state.pyodide = await loadPyodide();
-                await state.pyodide.loadPackage('micropip');
+                // Check if loadPyodide is available
+                if (typeof loadPyodide === 'undefined') {
+                    throw new Error('Pyodide not loaded');
+                }
                 
-                // Set up stdout/stderr redirection
-                state.pyodide.setStdout({ batched: (text) => addToConsole(text, 'normal') });
-                state.pyodide.setStderr({ batched: (text) => addToConsole(text, 'error') });
+                state.pyodide = await loadPyodide({
+                    stdout: (text) => addToConsole(text, 'normal'),
+                    stderr: (text) => addToConsole(text, 'error')
+                });
+                
+                // Try to load micropip, but don't fail if it doesn't work
+                try {
+                    await state.pyodide.loadPackage('micropip');
+                } catch (e) {
+                    console.warn('micropip not loaded:', e);
+                }
                 
                 // Hide loading overlay
                 document.getElementById('loading-overlay').style.display = 'none';
                 
                 addToConsole('Python environment loaded successfully! 🐍', 'success');
+                addToConsole('Ready to run code. Try: print("Hello, World!")', 'normal');
             } catch (error) {
                 console.error('Failed to load Pyodide:', error);
-                addToConsole('⚠️ Warning: Python execution not available. Editor works but code won\'t run.', 'error');
-                document.getElementById('loading-overlay').style.display = 'none';
+                document.querySelector('.loading-text').textContent = 'Python not available. Editor only mode.';
+                
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }, 2000);
+                
+                addToConsole('⚠️ Python execution not available. Editor works but code won\'t run.', 'error');
+                addToConsole('Error: ' + error.message, 'error');
             }
         }
 
@@ -828,7 +878,12 @@ print("="*40)`
 
         // Code Execution
         async function runCode() {
-            if (!state.pyodide || state.isRunning) return;
+            if (state.isRunning) return;
+            
+            if (!state.pyodide) {
+                addToConsole('❌ Python environment not loaded yet. Please wait or refresh the page.', 'error');
+                return;
+            }
             
             const code = state.editor.getValue();
             const consoleOutput = document.getElementById('console-output');
@@ -1083,6 +1138,10 @@ sys.modules['turtle'].turtle = MockTurtle()
         // Output Management
         function addToConsole(text, type = 'normal') {
             const consoleOutput = document.getElementById('console-output');
+            if (!consoleOutput) {
+                console.log('[Console not ready]:', text);
+                return;
+            }
             const line = document.createElement('div');
             line.className = `console-line ${type}`;
             line.textContent = text;
